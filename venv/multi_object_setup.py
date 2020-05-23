@@ -6,140 +6,152 @@ import dlib
 import cv2
 
 
-def resize_and_recolor_frame(frame):
-    frame = imutils.resize(frame, width=600)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    return frame, rgb
+class ObjectTracker:
+
+    def __init__(self, args):
+        self.CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
+                   "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog",
+                   "horse", "motorbike", "person", "pottedplant", "sheep", "sofa",
+                   "train", "tvmonitor"]
+        self.args = args
+        self.trackers = []
+        self.labels = []
+
+        # Frame variables
+        self.net = None
+        self.vs = None
+        self.frame = ''  # Current frame being analyzed.
+        self.rgb = None  # Current RGB frame being analyzed.
+
+        self.detections = None
+
+        # Coordinate variables.
+        self.h = 0
+        self.w = 0
+        self.x0 = 0
+        self.y0 = 0
+        self.x1 = 0
+        self.y1 = 0
+        self.centroid = []
+
+    def resize_and_recolor_frame(self):
+        self.frame = imutils.resize(self.frame, width=600)
+        self.rgb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+
+    def get_object_detections(self):
+        (self.h, self.w) = self.frame.shape[:2]
+        blob = cv2.dnn.blobFromImage(self.frame, 0.007843, (self.w, self.h), 127.5)
+        self.net.setInput(blob)
+        self.detections = self.net.forward()
+
+    def get_detection_box_dims(self, detection_object):
+        h = self.h
+        w = self.w
+        box = detection_object * np.array([w, h, w, h])
+        (self.x0, self.y0, self.x1, self.y1) = box.astype("int")
+
+    def calc_center(self):
+        (startX, startY, endX, endY) = get_detection_box_dims(detection_object)
+        mid_x = abs(self.x0 - self.x1)
+        mid_y = abs(self.y0 - self.y1)
+        self.centroid = [mid_y, mid_y]
+
+    def create_tracker(self):
+        t = dlib.correlation_tracker()
+        rect = dlib.rectangle(self.x0, self.y0, self.x1, self.y1)
+        t.start_track(self.rgb, rect)
+        return t
 
 
-def get_object_detections(frame, net):
-    (h, w) = frame.shape[:2]
-    blob = cv2.dnn.blobFromImage(frame, 0.007843, (w, h), 127.5)
-    net.setInput(blob)
-    detections = net.forward()
-    return detections, h, w
+    def start(self):
+        # load our serialized model from disk
+        print("[INFO] loading model...")
+        self.net = cv2.dnn.readNetFromCaffe(self.args['prototxt'], self.args['model'])
 
+        # initialize the video stream and output video writer
+        print("[INFO] starting video stream...")
+        self.vs = cv2.VideoCapture(self.args['vid'])
 
-def get_detection_box_dims(detection_object, h, w):
-    box = detection_object * np.array([w, h, w, h])
-    (startX, startY, endX, endY) = box.astype("int")
-    return startX, startY, endX, endY
+        # start the frames per second throughput estimator
+        fps = FPS().start()
 
+        frame_counter = 0
 
-def calc_center(detection_object):
-    (startX, startY, endX, endY) = get_detection_box_dims(detection_object)
-    mid_x = abs(startX - endX)
-    mid_y = abs(startY - endY)
-    return mid_x, mid_y
+        while True:
 
+            (grabbed, self.frame) = self.vs.read()
+            frame_counter += 1
 
-def create_tracker(startX, startY, endX, endY, rgb):
-    t = dlib.correlation_tracker()
-    rect = dlib.rectangle(startX, startY, endX, endY)
-    t.start_track(rgb, rect)
-    return t
+            if self.frame is None:
+                break
 
+            self.resize_and_recolor_frame()
 
-def main(args):
-    # initialize the list of class labels MobileNet SSD was trained to detect.
-    CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
-               "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog",
-               "horse", "motorbike", "person", "pottedplant", "sheep", "sofa",
-               "train", "tvmonitor"]
+            ##
+            # Place holder for writing to file
+            ##
 
-    # load our serialized model from disk
-    print("[INFO] loading model...")
-    net = cv2.dnn.readNetFromCaffe(args['prototxt'], args['model'])
+            if len(self.trackers) == 0 or frame_counter >= 10:
+                frame_counter = 0
+                #(detections, h, w) = self.get_object_detections()
+                self.get_object_detections()
 
-    # initialize the video stream and output video writer
-    print("[INFO] starting video stream...")
-    vs = cv2.VideoCapture(vid)
-    writer = None
+                for i in np.arange(0, self.detections.shape[2]):
+                    confidence = self.detections[0, 0, i, 2]
 
-    # initialize the list of object trackers and corresponding class
-    # labels
-    trackers = []
-    labels = []
+                    if confidence > self.args["confidence"]:
+                        class_label_index = int(self.detections[0, 0, i, 1])
+                        detection_label = self.CLASSES[class_label_index]
 
-    # start the frames per second throughput estimator
-    fps = FPS().start()
+                        # if the class label is not a person, ignore it
+                        if self.CLASSES[class_label_index] != "person":
+                            continue
 
-    frame_counter = 0
+                        # TODO: Change this up and make it a dict
+                        self.get_detection_box_dims(self.detections[0, 0, i, 3:7])
+                        t = self.create_tracker()
 
-    while True:
+                        label = str(detection_label + str(len(self.labels)))
+                        self.labels.append(label)
+                        self.trackers.append(t)
 
-        (grabbed, frame) = vs.read()
-        frame_counter += 1
+                        cv2.rectangle(self.frame, (self.x0, self.y0), (self.x1, self.y1),
+                                      (0, 255, 0), 2)
+                        cv2.putText(self.frame, label, (self.x0, self.y0 - 15),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
 
-        if frame is None:
-            break
+            else:
+                for (t, l) in zip(self.trackers, self.labels):
 
-        (frame, rgb) = resize_and_recolor_frame(frame)
+                    t.update(self.rgb)
+                    pos = t.get_position()
 
-        ##
-        # Place holder for writing to file
-        ##
+                    self.x0 = int(pos.left())
+                    self.y0 = int(pos.top())
+                    self.x1 = int(pos.right())
+                    self.y1 = int(pos.bottom())
 
-        if len(trackers) == 0 or frame_counter >= 10:
-            frame_counter = 0
-            (detections, h, w) = get_object_detections(frame, net)
-
-            for i in np.arange(0, detections.shape[2]):
-                confidence = detections[0, 0, i, 2]
-
-                if confidence > args["confidence"]:
-                    class_label_index = int(detections[0, 0, i, 1])
-                    detection_label = CLASSES[class_label_index]
-
-                    # if the class label is not a person, ignore it
-                    if CLASSES[class_label_index] != "person":
-                        continue
-
-                    # TODO: Change this up and make it a dict
-                    (startX, startY, endX, endY) = get_detection_box_dims(detections[0, 0, i, 3:7], h, w)
-                    t = create_tracker(startX, startY, endX, endY, rgb)
-
-                    label = str(detection_label + str(len(labels)))
-                    labels.append(label)
-                    trackers.append(t)
-
-                    cv2.rectangle(frame, (startX, startY), (endX, endY),
+                    cv2.rectangle(self.frame, (self.x0, self.y0), (self.x1, self.y1),
                                   (0, 255, 0), 2)
-                    cv2.putText(frame, label, (startX, startY - 15),
+                    cv2.putText(self.frame, l, (self.x0, self.y0 - 15),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
 
-        else:
-            for (t, l) in zip(trackers, labels):
+            cv2.imshow("Frame", self.frame)
+            key = cv2.waitKey(1) & 0xFF
 
-                t.update(rgb)
-                pos = t.get_position()
+            if key == ord("q"):
+                break
 
-                startX = int(pos.left())
-                startY = int(pos.top())
-                endX = int(pos.right())
-                endY = int(pos.bottom())
+            fps.update()
 
-                cv2.rectangle(frame, (startX, startY), (endX, endY),
-                              (0, 255, 0), 2)
-                cv2.putText(frame, l, (startX, startY - 15),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+        # stop the timer and display FPS information
+        fps.stop()
+        print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
+        print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 
-        cv2.imshow("Frame", frame)
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord("q"):
-            break
-
-        fps.update()
-
-    # stop the timer and display FPS information
-    fps.stop()
-    print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
-    print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
-
-     # do a bit of cleanup
-    cv2.destroyAllWindows()
-    vs.release()
+         # do a bit of cleanup
+        cv2.destroyAllWindows()
+        self.vs.release()
 
 
 vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/trimmed_cbj_van.mp4'
@@ -149,4 +161,5 @@ confidence = 0.2
 
 args_ = {'vid': vid, 'prototxt': prototxt, 'model': model, 'confidence': confidence}
 
-main(args_)
+ot = ObjectTracker(args_)
+ot.start()
