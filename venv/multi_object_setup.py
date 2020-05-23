@@ -22,6 +22,7 @@ class ObjectTracker:
         self.vs = None
         self.frame = ''  # Current frame being analyzed.
         self.rgb = None  # Current RGB frame being analyzed.
+        self.current_label = ''
 
         self.detections = None
 
@@ -62,6 +63,23 @@ class ObjectTracker:
         t.start_track(self.rgb, rect)
         return t
 
+    def update_boxes(self, t, label):
+        t.update(self.rgb)
+        pos = t.get_position()
+
+        self.x0 = int(pos.left())
+        self.y0 = int(pos.top())
+        self.x1 = int(pos.right())
+        self.y1 = int(pos.bottom())
+
+        self.current_label = label
+        self.draw_box()
+
+    def draw_box(self):
+        cv2.rectangle(self.frame, (self.x0, self.y0), (self.x1, self.y1),
+                      (0, 255, 0), 2)
+        cv2.putText(self.frame, self.current_label, (self.x0, self.y0 - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
 
     def start(self):
         # load our serialized model from disk
@@ -79,7 +97,8 @@ class ObjectTracker:
 
         while True:
 
-            (grabbed, self.frame) = self.vs.read()
+            frame_tuple = self.vs.read()
+            self.frame = frame_tuple[1]
             frame_counter += 1
 
             if self.frame is None:
@@ -87,13 +106,8 @@ class ObjectTracker:
 
             self.resize_and_recolor_frame()
 
-            ##
-            # Place holder for writing to file
-            ##
-
             if len(self.trackers) == 0 or frame_counter >= 10:
                 frame_counter = 0
-                #(detections, h, w) = self.get_object_detections()
                 self.get_object_detections()
 
                 for i in np.arange(0, self.detections.shape[2]):
@@ -107,34 +121,18 @@ class ObjectTracker:
                         if self.CLASSES[class_label_index] != "person":
                             continue
 
-                        # TODO: Change this up and make it a dict
                         self.get_detection_box_dims(self.detections[0, 0, i, 3:7])
                         t = self.create_tracker()
 
-                        label = str(detection_label + str(len(self.labels)))
-                        self.labels.append(label)
+                        self.current_label = str(detection_label + str(len(self.labels)))
+                        self.labels.append(self.current_label)
                         self.trackers.append(t)
 
-                        cv2.rectangle(self.frame, (self.x0, self.y0), (self.x1, self.y1),
-                                      (0, 255, 0), 2)
-                        cv2.putText(self.frame, label, (self.x0, self.y0 - 15),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+                        self.draw_box()
 
             else:
-                for (t, l) in zip(self.trackers, self.labels):
-
-                    t.update(self.rgb)
-                    pos = t.get_position()
-
-                    self.x0 = int(pos.left())
-                    self.y0 = int(pos.top())
-                    self.x1 = int(pos.right())
-                    self.y1 = int(pos.bottom())
-
-                    cv2.rectangle(self.frame, (self.x0, self.y0), (self.x1, self.y1),
-                                  (0, 255, 0), 2)
-                    cv2.putText(self.frame, l, (self.x0, self.y0 - 15),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+                for (t, label) in zip(self.trackers, self.labels):
+                    self.update_boxes(t, label)
 
             cv2.imshow("Frame", self.frame)
             key = cv2.waitKey(1) & 0xFF
@@ -157,7 +155,7 @@ class ObjectTracker:
 vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/trimmed_cbj_van.mp4'
 prototxt = 'mobilenet_ssd/MobileNetSSD_deploy.prototxt'
 model = 'mobilenet_ssd/MobileNetSSD_deploy.caffemodel'
-confidence = 0.2
+confidence = 0.15
 
 args_ = {'vid': vid, 'prototxt': prototxt, 'model': model, 'confidence': confidence}
 
