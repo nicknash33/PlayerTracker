@@ -61,7 +61,8 @@ class ObjectTracker:
         t = dlib.correlation_tracker()
         rect = dlib.rectangle(self.x0, self.y0, self.x1, self.y1)
         t.start_track(self.rgb, rect)
-        return t
+        self.labels.append(self.current_label)
+        self.trackers.append(t)
 
     def update_boxes(self, t, label):
         t.update(self.rgb)
@@ -116,17 +117,14 @@ class ObjectTracker:
                     if confidence > self.args["confidence"]:
                         class_label_index = int(self.detections[0, 0, i, 1])
                         detection_label = self.CLASSES[class_label_index]
+                        self.current_label = str(detection_label + str(len(self.labels)))
 
                         # if the class label is not a person, ignore it
-                        if self.CLASSES[class_label_index] != "person":
+                        if self.current_label[0:6] != "person":
                             continue
 
                         self.get_detection_box_dims(self.detections[0, 0, i, 3:7])
-                        t = self.create_tracker()
-
-                        self.current_label = str(detection_label + str(len(self.labels)))
-                        self.labels.append(self.current_label)
-                        self.trackers.append(t)
+                        self.create_tracker()
 
                         self.draw_box()
 
