@@ -6,10 +6,13 @@
 
 class TrackedPlayer:
 
-    def __init__(self, rect_coords):
+    def __init__(self, rect_coords, tracker, label):
         self.coords = rect_coords  # {startx: , starty: , endx: , endy: }
         self.centroid = []
         self.calc_centroid()
+        self.t = tracker
+        self.name = label
+        self.on_ice = False
         # todo: There is a lot to add here.
 
     def calc_centroid(self):
