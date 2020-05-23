@@ -6,6 +6,8 @@ import dlib
 import cv2
 from trackedplayers import TrackedPlayer
 import time
+from CurrentTrackedObjects import CurrentTrackedObjects
+from detected_object import DetectedObject
 
 
 class ObjectTracker:
@@ -18,6 +20,7 @@ class ObjectTracker:
         self.args = args
         self.trackers = []
         self.labels = []
+        self.cto = args['currentTrackedObjects']
 
         # Frame variables
         self.net = None
@@ -60,7 +63,7 @@ class ObjectTracker:
     def calc_center(self):
         mid_x = abs(self.x0 - self.x1)
         mid_y = abs(self.y0 - self.y1)
-        self.centroid = [mid_x, mid_y]
+        self.centroid = dict(x=mid_x, y=mid_y)
 
     def create_tracker(self):
         p = None  # Clear any reference to player before assignment.
@@ -70,7 +73,7 @@ class ObjectTracker:
         self.calc_center()
         p = TrackedPlayer(self.centroid, t, self.current_label)
         #self.labels.append(self.current_label)
-        self.trackers.append(p)
+        return p
 
     def update_boxes(self, player):
         t = player.tracker
@@ -85,7 +88,6 @@ class ObjectTracker:
         self.current_label = player.name
         player.centroid = self.centroid
         self.draw_box()
-        print(f'{self.centroid} {self.current_label}')
 
     def draw_box(self):
         cv2.rectangle(self.frame, (self.x0, self.y0), (self.x1, self.y1),
@@ -103,19 +105,31 @@ class ObjectTracker:
         cv2.destroyAllWindows()
         self.vs.release()
 
-    def is_object_tracked(self):
-        x = self.centroid[0]
-        y = self.centroid[1]
-        print(self.centroid)
+    @staticmethod
+    def is_same_object(center_1, center_2):
+        x1 = center_1['x']
+        y1 = center_1['y']
+        x2 = center_2['x']
+        y2 = center_2['y']
 
-        for tracked_player in self.trackers:
-            delta_x = abs(x - tracked_player.centroid[0])
-            delta_y = abs(y - tracked_player.centroid[1])
-            if delta_x < 10 and delta_y < 10:
-                print('Already tracking an object close to here. Skipping')
-                return True
-        else:
-            return False
+        delta_x = abs(x2 - x1)
+        delta_y = abs(y2 - y1)
+
+        if delta_x <= 5 and delta_y <= 5:
+            return True
+
+        return False
+
+    def handle_new_objects(self, new_objects):
+        to_delete = []
+        for new_object in new_objects:
+            for obj in self.cto:
+                if is_same_object(new_object.centroid, obj.current_position):
+                    to_delete.append(index(new_object))
+                    break
+        for i in to_delete:
+            del new_objects[i]  # This is now actual new objects need to do stuff with it
+
 
     def start(self):
         # load our serialized model from disk
@@ -146,6 +160,7 @@ class ObjectTracker:
                 frame_counter = 0
                 self.get_object_detections()
 
+                current_detected_object_centers = []
                 for i in np.arange(0, self.detections.shape[2]):
                     confidence = self.detections[0, 0, i, 2]
 
@@ -160,13 +175,21 @@ class ObjectTracker:
 
                         self.current_detection_object = self.detections[0, 0, i, 3:7]
                         self.get_detection_box_dims(self.current_detection_object)
-                        if not self.is_object_tracked():
-                            self.create_tracker()
-                            self.draw_box()
+                        new_obj = DetectedObject({'x0': self.x0, 'x1': self.x1, 'y0': self.y0, 'y1': self.y1})
+                        new_detected_objects.append(new_obj)
+
+                        self.create_tracker()
+                        self.draw_box()
 
             else:
+                centers = {}
                 for tracked_player in self.trackers:
                     self.update_boxes(tracked_player)
+                    centers[tracked_player.name] = tracked_player.centroid
+
+                if frame_counter >= 9:
+
+                    print(centers)
 
 
             cv2.imshow("Frame", self.frame)
@@ -184,8 +207,9 @@ vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/trimmed_cbj_van.
 prototxt = 'mobilenet_ssd/MobileNetSSD_deploy.prototxt'
 model = 'mobilenet_ssd/MobileNetSSD_deploy.caffemodel'
 confidence = 0.10
+cto = CurrentTrackedObjects()
 
-args_ = {'vid': vid, 'prototxt': prototxt, 'model': model, 'confidence': confidence}
+args_ = {'vid': vid, 'prototxt': prototxt, 'model': model, 'confidence': confidence, 'currentTrackedObjects': cto}
 
 ot = ObjectTracker(args_)
 ot.start()
