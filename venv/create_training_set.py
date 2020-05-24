@@ -61,6 +61,7 @@ while True:
             cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv.putText(frame, str(i), (x, y - 15), cv.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
             cv.imshow("Frame", frame)
+            key = cv.waitKey(1) & 0xFF
             i += 1
 
         box_data = {}
