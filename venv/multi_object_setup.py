@@ -127,6 +127,7 @@ class ObjectTracker:
                 if is_same_object(new_object.centroid, obj.current_position):
                     to_delete.append(index(new_object))
                     break
+
         for i in to_delete:
             del new_objects[i]  # This is now actual new objects need to do stuff with it
 
