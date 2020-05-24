@@ -52,17 +52,17 @@ while True:
             continue
 
         cv.imwrite(f'/Users/nick/PycharmProjects/PlayerTracker/venv/training_data/images/{frame_id}.jpg', frame)
+        cv.destroyAllWindows()
 
         i = 0
         for box in boxes:
-            print('Hello')
             # Draw our boxes and re-display.
             (x, y, w, h) = [int(v) for v in box]
             cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv.putText(frame, str(i), (x, y - 15), cv.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+            i += 1
             cv.imshow("Frame", frame)
             key = cv.waitKey(1) & 0xFF
-            i += 1
 
         box_data = {}
         i = 0
