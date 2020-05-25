@@ -172,7 +172,8 @@ if writer is not None:
 	writer.release()
 
 # do a bit of cleanup
-cv2.destroyAllWindows()
+cv2.destroyAlp
+lWindows()
 vs.release()
 
 
