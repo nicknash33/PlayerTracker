@@ -6,7 +6,7 @@ import cv2 as cv
 import random
 import json
 
-vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/chi_stl_trimmed.mp4'
+vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/nsh_dal_trimmed_no_audio.mp4'
 
 vs = cv.VideoCapture(vid)
 
@@ -15,6 +15,7 @@ frame_counter = 0
 rand_skip = int(random.randrange(0, 500))
 frame = 0
 data = {}
+box_counter = 0
 
 
 def create_frame_id(frame_number):
@@ -46,7 +47,7 @@ while True:
     if frame_counter >= rand_skip:
         frame_data = {}
         boxes = []
-        frame = imutils.resize(frame, width=1000)
+        frame = imutils.resize(frame, width=800)
         frame_id = create_frame_id(frame_counter)
         rand_skip = frame_counter + num_frames_to_skip()  # Get new frame incase we skip
 
@@ -54,13 +55,14 @@ while True:
         cv.imshow("Frame", frame)
         key = cv.waitKey(1) & 0xFF
         boxes = cv.selectROIs("Frame", frame, fromCenter=False, showCrosshair=True)
+        print(boxes)
 
         if len(boxes) == 0:
             # We skipped this frame so we are going to dump it.
             print('No boxes detected. Moving on.')
             continue
 
-        cv.imwrite(f'/Users/nick/PycharmProjects/PlayerTracker/venv/training_data/images/{frame_id}.jpg', frame)
+        cv.imwrite(f'/Users/nick/PycharmProjects/PlayerTracker/venv/NeuralNetwork/training_data/images/{frame_id}.jpg', frame)
         cv.destroyAllWindows()
         print('Got boxes moving on to identification. ')
 
@@ -144,7 +146,7 @@ while True:
 
             difficult = True if input('difficult? ') == 'y' else False
             print('\n')
-            (x, y, w, h) = [int(v) for v in box]
+            (x, y, w, h) = [int(v) for v in boxes[i]]
 
             box_data[i] = {
                 'loc': {
@@ -161,15 +163,15 @@ while True:
             }
             i += 1
 
-        data['frame_id'] = {
-                          'boxes': box_data
-                          }
+        data['boxes'] = box_data
 
-        with open(f'/Users/nick/PycharmProjects/PlayerTracker/venv/training_data/image_data/{frame_id}.json', 'w') as fp:
+        with open(f'/Users/nick/PycharmProjects/PlayerTracker/venv/NeuralNetwork/training_data/image_data/{frame_id}.json', 'w') as fp:
             json.dump(data, fp, indent=4)
 
         print(f'Saved {frame_id}.json. Moving on.')
+        box_counter += len(boxes)
         cv.destroyAllWindows()
 
 
 print(frame_counter)
+print(f'Found {boxes}.')
