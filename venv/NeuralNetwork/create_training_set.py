@@ -6,7 +6,7 @@ import cv2 as cv
 import random
 import json
 
-vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/nsh_dal_trimmed_no_audio.mp4'
+vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/chi_stl_trimmed.mp4'
 
 vs = cv.VideoCapture(vid)
 
@@ -26,6 +26,7 @@ def create_frame_id(frame_number):
         frame_number = str('0' + frame_number)
 
     return frame_number
+
 
 def num_frames_to_skip():
     # Has 5 % chance of next frame being close (20-90 frames) if not go far (10-15k) frames away
