@@ -175,4 +175,4 @@ while True:
 
 
 print(frame_counter)
-print(f'Found {boxes}.')
+print(f'Found {box_counter}.')
