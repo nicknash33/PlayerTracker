@@ -24,7 +24,7 @@ def load_into_model(data):
     xmaxs = [data['xmaxs'] / width]
     ymins = [data['ymins'] / height]
     ymaxs = [data['ymaxs'] / height]
-    classes_text = [data['class']]
+    classes_text = [data['classes_text']]
     classes = [data['class_id']]
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={
@@ -58,8 +58,9 @@ def get_class(data):
 
 
 def extract_organize_data(data, id):
+    frame_data = []
     for box in data:
-        extracted_data = {}
+        extracted_data = None
         (xmin, xmax, ymin, ymax) = get_dims(data[box])
         class_name = get_class(data[box])
         if class_name == 'player':
@@ -72,11 +73,19 @@ def extract_organize_data(data, id):
             print('Got invalid class name. Defaulting to player')
             class_id = 1
 
+        extracted_data = dict(
+            classes_id=class_id,
+            classes_text=class_name,
+            xmaxs=xmax,
+            xmins=xmin,
+            ymins=ymin,
+            ymaxs=ymax
+        )
 
 def main(_):
     writer = tf.python_io.TFRecordWriter(FLAGS.output)
-
-    all_frame_data = [f for f in listdir(mypath) if isfile(join(mypath, f))]
+    path = '/Users/nick/PycharmProjects/PlayerTracker/venv/NeuralNetwork/training_data/image_data'
+    all_frame_data = [f for f in listdir(path) if isfile(join(path, f))]
 
     for frame_data in all_frame_data:
         extracted_data = {}

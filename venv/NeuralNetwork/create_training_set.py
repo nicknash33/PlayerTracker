@@ -6,7 +6,7 @@ import cv2 as cv
 import random
 import json
 
-vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/chi_stl_trimmed.mp4'
+vid = '/Users/nick/PycharmProjects/PlayerTracker/venv/game_film/ott_lak_trimmed_no_audio.mp4'
 
 vs = cv.VideoCapture(vid)
 
